@@ -52,6 +52,7 @@ Options:
 
 Route          | Description
 -------------- | --------------------------------------------------------
+`/oauth/cb`    | Callback for OAuth2 Authorization Response (`redirect_uri`)
 `/profile`     | Displays the claims and userinfo for the authenticated user
 `/login`       | Initiates an OIDC authentication request to the OpenID Provider (OP)
 `/login/force` | Initiates an OIDC authentication request with `max_age=0` to force re-authentication with the OpenID Provider (OP)

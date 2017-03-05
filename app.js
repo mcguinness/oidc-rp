@@ -18,6 +18,10 @@ module.exports = function(issuer, client, authzParams) {
 
   const app = express();
   const callbackRoute = url.parse(authzParams.redirect_uri).path;
+  const clientModel = {
+    id: client.client_id,
+    redirectUrl: authzParams.redirect_uri
+  };
 
   /**
    * Middleware.
@@ -100,26 +104,20 @@ module.exports = function(issuer, client, authzParams) {
       console.log('User %s successfully logged out', req.user.claims.id);
     }
     res.render('logout', {
-      client: {
-        id: client.client_id,
-        redirectUrl: authzParams.redirect_uri
-      }
+      client: clientModel
     });
   });
 
   app.get(['/', '/profile'], function(req, res) {
-      if(req.isAuthenticated()){
-        res.render('profile', {
-          client: {
-            id: client.client_id,
-            redirectUrl: authzParams.redirect_uri
-          },
-          user: req.user,
-          params: authzParams
-        });
-      } else {
-        res.redirect('/login');
-      }
+    if(req.isAuthenticated()){
+      res.render('profile', {
+        client: clientModel,
+        user: req.user,
+        params: authzParams
+      });
+    } else {
+      res.redirect('/login');
+    }
   });
 
   app.get('/error', function(req, res) {
@@ -138,6 +136,7 @@ module.exports = function(issuer, client, authzParams) {
   app.use(function(err, req, res, next) {
     res.status(err.status || 500);
     res.render('error', {
+      client: clientModel,
       message: err.message,
       error: err.status === 404 ? null : err
     });
