@@ -1,0 +1,10 @@
+body { padding-top: 70px; }
+
+label { font-weight: 600; }
+
+.navbar-brand-logo {
+  padding-top: 7px;
+}
+.navbar-brand-logo img {
+  height: 30px;
+}

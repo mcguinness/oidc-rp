@@ -1,0 +1,22 @@
+{
+  "name": "oidc-rp",
+  "version": "0.1.0",
+  "description": "Simple OpenID Connect Relying Party (RP) for express.js",
+  "main": "server.js",
+  "private": true,
+  "author": "Karl McGuinness",
+  "email": "dev@karlmcguinnes.com",
+  "license": "MIT",
+  "dependencies": {
+    "body-parser": "~1.10.2",
+    "cookie-parser": "~1.3.3",
+    "express": "~4.11.1",
+    "express-session": "^1.10.1",
+    "hbs": "~2.8.0",
+    "lodash": "^4.17.4",
+    "morgan": "~1.5.1",
+    "openid-client": "^1.6.0",
+    "passport": "^0.2.1",
+    "yargs": "^1.3.3"
+  }
+}
