@@ -95,7 +95,7 @@ Issuer.discover(argv.issuer).then(function(issuer) {
     client_id: argv.clientId,
     client_secret: argv.clientSecret
   });
-  const redirectUrl = (argv.https ? 'https' : 'http') + '://localhost:' + argv.port + '/oauth/cb';
+  const redirectUrl = (argv.https ? 'https' : 'http') + '://localhost:' + argv.port + '/oauth/callback';
   const authzParams = {
     scope: argv.scope,
     response_type: argv.responseType,
@@ -130,6 +130,7 @@ Issuer.discover(argv.issuer).then(function(issuer) {
     console.log('OP Token URL:\n\t' + issuer.metadata.token_endpoint);
     console.log('OP UserInfo URL:\n\t' + issuer.metadata.userinfo_endpoint);
     console.log('OP JWKS URL:\n\t' + issuer.metadata.jwks_uri);
+    console.log('OP End Session URL:\n\t' + issuer.metadata.end_session_endpoint);
     console.log();
     console.log('Authentication Request:\n\t' + client.authorizationUrl(_.defaults({state: '{state}', nonce: '{nonce}'}, authzParams)));
     console.log();

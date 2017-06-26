@@ -24,11 +24,48 @@ The following client/RP features from OpenID Connect/OAuth2.0 specifications are
 
 `npm install`
 
-## Usage
+## OAuth Client Registration
+
+An OAuth 2.0 Client needs to be registered for this application with your OpenID Provider (OP).
+
+Parameter                   | Default Value                           | Description
+--------------------------- |---------------------------------------- | -------------------------------------
+`response_types`            | `code`                                  | Requests an authorization code for the OAuth2 Authorization Response (Authorization Code flow)
+`grant_types`               | `authorization_code`                    | Authorization Code flow
+`redirect_uris`             | `http://localhost:7080/oauth/callback`  | Callback for OAuth2 Authorization Response
+`post_logout_redirect_uris` | `http://localhost:7080/logout/callback` | Callback for OIDC RP-initiated logout
+
+> Note: These values match defaults, changing command-line arguments may require additional client registration configuration
+
+### Sample Dynamic Client Registration
+
+The following example shows OAuth client registration for an OP that supports [OAuth 2.0 Dynamic Client Registration Protocol][client-reg]
+
+```json
+{
+  "client_name": "Simple OIDC RP",
+  "client_uri": null,
+  "logo_uri": null,
+  "redirect_uris": [
+    "http://localhost:7080/oauth/callback"
+  ],
+  "post_logout_redirect_uris": [
+    "http://localhost:7080/logout/callback"
+  ],
+  "response_types": [
+    "code"
+  ],
+  "grant_types": [
+    "authorization_code"
+  ],
+  "token_endpoint_auth_method": "client_secret_basic",
+  "application_type": "web"
+}
+```
+
+# Usage
 
 `node server.js --iss {url} --cid {client_id} --cs {client_secret}`
-
-> **Note:** You must register the Relying Party (RP) as a client at the OpenID Provider (OP) manually to obtain a `client_id` and `client_secret`
 
 ```
 Options:
@@ -44,22 +81,25 @@ Options:
   --https                   Enables HTTPS Listener (requires key and cert params)           [required]  [default: false]
 ```
 
-### Example
+> **Note:** You must [register the Relying Party (RP) as a client](#oauth-client-registration) at the OpenID Provider (OP) manually to obtain a `client_id` and `client_secret`.  The default `redirect_uri` for the client is `http://localhost:7080/oauth/callback`.
+
+## Example
 
 `node server.js --iss https://example.okta.com --cid YRBDFADvhbcsuwGJfP96 --cs 296iRuRznZFupE1F1yjxIw7y-kSYeGGtUJIfGJqo`
 
-# Default Routes
+## Default Routes
 
-Route          | Description
--------------- | --------------------------------------------------------
-`/oauth/cb`    | Callback for OAuth2 Authorization Response (`redirect_uri`)
-`/profile`     | Displays the claims and userinfo for the authenticated user
-`/login`       | Initiates an OIDC authentication request to the OpenID Provider (OP)
-`/login/force` | Initiates an OIDC authentication request with `max_age=0` to force re-authentication with the OpenID Provider (OP)
-`/logout`      | Destroys the user's active session
-
+Route              | Description
+------------------ | ------------------------------------------------------------------------------
+`/login`           | Initiates an OIDC authentication request to the OpenID Provider (OP)
+`/login/force`     | Initiates an OIDC authentication request with `max_age=0` to force re-authentication with the OpenID Provider (OP)
+`/logout`          | Initiates an OIDC logout request to the OpenID Provider (OP)
+`/logout/callback` | Callback for RP-initiated logout (`post_logout_redirect_uris`)
+`/profile`         | Displays the claims and userinfo for the authenticated user
+`/oauth/callback`  | Callback for OAuth2 Authorization Response (`redirect_uri`)
 
 
 [openid-connect]: http://openid.net/connect/
 [feature-core]: http://openid.net/specs/openid-connect-core-1_0.html
 [feature-discovery]: http://openid.net/specs/openid-connect-discovery-1_0.html
+[client-reg]: https://tools.ietf.org/html/rfc7591

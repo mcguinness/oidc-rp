@@ -79,6 +79,10 @@ module.exports = function(issuer, client, authzParams) {
     return done(null, {
       issuer: issuer.issuer,
       claims: tokenset.claims,
+      tokens: {
+        id_token: tokenset.id_token,
+        access_token: tokenset.access_token
+      },
       userinfo: userinfo
     });
   }));
@@ -100,12 +104,41 @@ module.exports = function(issuer, client, authzParams) {
 
   app.get('/logout', function(req, res) {
     if (req.isAuthenticated()) {
-      req.session.destroy();
-      console.log('User %s successfully logged out', req.user.claims.id);
+      if (issuer.end_session_endpoint) {
+        req.session.logout_state = crypto.randomBytes(24).toString('hex');
+        const logoutUrl = url.format(Object.assign(url.parse(issuer.end_session_endpoint), {
+          search: null,
+          query: {
+            id_token_hint: req.user.tokens.id_token,
+            post_logout_redirect_uri: req.protocol + '://' + req.get('host') + req.url + '/callback',
+            state: req.session.logout_state
+          }
+        }));
+        console.log('RP-initated logout redirect with %s', logoutUrl);
+        res.redirect(logoutUrl);
+      } else {
+        console.log('User %s successfully logged out', req.user.claims.id);
+        req.session.destroy();
+        return res.render('logout', {
+          client: clientModel
+        });
+      }
     }
-    res.render('logout', {
-      client: clientModel
-    });
+  });
+
+  app.get('/logout/callback', function(req, res) {
+    console.log(req.query);
+    if (req.isAuthenticated() && req.query.state && req.session.logout_state) {
+      if (req.query.state === req.session.logout_state) {
+        console.log('User %s successfully logged out', req.user.claims.id);
+        req.session.destroy();
+        return res.render('logout', {
+          client: clientModel
+        });
+      } else {
+        console.log('Unable to logout user because the redirected state doesn\'t match the session state value');
+      }
+    }
   });
 
   app.get(['/', '/profile'], function(req, res) {
