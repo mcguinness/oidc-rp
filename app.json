@@ -1,0 +1,22 @@
+{
+  "name": "Okta Node.js OIDC-RP Sample",
+  "description": "A Node.js/Express app showing how to integrate with Okta via OIDC as a Relying Party",
+  "repository": "https://github.com/jpf/oidc-rp",
+  "logo": "https://www.okta.com/sites/all/themes/Okta/images/blog/Auras/Okta_Aura_Solid_BrightBlue_40percent.png",
+  "success_url": "/welcome",
+  "env": {
+    "ISSUER": {
+      "description": "OpenID Connect Provider (OP) Issuer URL",
+      "value": "https://example.oktapreview.com"
+    },
+    "CLIENT_ID": {
+      "description": "Client ID registered for RP at the OP",
+      "value": "ANRZhyDh8HBFN5abN6Rg"
+    },
+    "CLIENT_SECRET": {
+      "description": "Client Secret registered for RP at the OP",
+      "value": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    }
+  },
+  "keywords": ["node", "express", "oidc", "okta"]
+}

@@ -10,6 +10,7 @@ const logger              = require('morgan');
 const cookieParser        = require('cookie-parser');
 const bodyParser          = require('body-parser');
 const session             = require('express-session');
+const flash               = require('express-flash');
 const passport            = require('passport');
 const Strategy            = require('openid-client').Strategy;
 
@@ -17,11 +18,17 @@ const Strategy            = require('openid-client').Strategy;
 module.exports = function(issuer, client, authzParams) {
 
   const app = express();
-  const callbackRoute = url.parse(authzParams.redirect_uri).path;
+  const callbackRoute = '/oauth/callback';
   const clientModel = {
     id: client.client_id,
-    redirectUrl: authzParams.redirect_uri
+    redirectUrl: 'ERROR'
   };
+
+  function redirectUrlFor(req) {
+    var rv = req.protocol + "://" + req.headers.host + callbackRoute;
+    console.log(rv);
+    return rv;
+  }
 
   /**
    * Middleware.
@@ -29,6 +36,8 @@ module.exports = function(issuer, client, authzParams) {
 
   // environment
   app.set('views', path.join(__dirname, 'views'));
+  // Trust the X-Forwarded-Proto header that Heroku, Ngrok, & etc set for TLS connections
+  app.enable('trust proxy');
 
   // view engine
   app.set('view engine', 'hbs');
@@ -49,6 +58,7 @@ module.exports = function(issuer, client, authzParams) {
   });
 
   // middleware
+  app.use(flash());
   app.use(logger(':date> :method :url - {:referrer} => :status (:response-time ms)'));
   app.use(bodyParser.urlencoded({ extended: false }));
   app.use(cookieParser());
@@ -93,16 +103,18 @@ module.exports = function(issuer, client, authzParams) {
 
   app.get('/login', passport.authenticate('oidc'));
   app.get('/login/force', function(req, res, next) {
+    authzParams.redirect_uri = redirectUrlFor(req);
     return passport.authenticate('oidc', _.defaults({
         max_age: 0
       }, authzParams)
     )(req, res, next);
   })
 
-  app.post(callbackRoute, passport.authenticate('oidc', { successRedirect: '/profile', failureRedirect: '/error' }));
-  app.get(callbackRoute, passport.authenticate('oidc', { successRedirect: '/profile', failureRedirect: '/error' }));
+  app.post(callbackRoute, passport.authenticate('oidc', { successRedirect: '/profile', failureRedirect: '/error', failureFlash: true }));
+  app.get(callbackRoute, passport.authenticate('oidc', { successRedirect: '/profile', failureRedirect: '/error', failureFlash: true }));
 
   app.get('/logout', function(req, res) {
+    clientModel.redirectUrl = redirectUrlFor(req);
     if (req.isAuthenticated()) {
       if (issuer.end_session_endpoint) {
         req.session.logout_state = crypto.randomBytes(24).toString('hex');
@@ -117,8 +129,8 @@ module.exports = function(issuer, client, authzParams) {
         console.log('RP-initated logout redirect with %s', logoutUrl);
         res.redirect(logoutUrl);
       } else {
-        console.log('User %s successfully logged out', req.user.claims.id);
-        req.session.destroy();
+        console.log('User %s successfully logged out via RP-initated logout', req.user.claims.id);
+        req.logout();
         return res.render('logout', {
           client: clientModel
         });
@@ -127,11 +139,12 @@ module.exports = function(issuer, client, authzParams) {
   });
 
   app.get('/logout/callback', function(req, res) {
+    clientModel.redirectUrl = redirectUrlFor(req);
     console.log(req.query);
     if (req.isAuthenticated() && req.query.state && req.session.logout_state) {
       if (req.query.state === req.session.logout_state) {
-        console.log('User %s successfully logged out', req.user.claims.id);
-        req.session.destroy();
+        console.log('User %s successfully logged out via callback', req.user.claims.id);
+        req.logout();
         return res.render('logout', {
           client: clientModel
         });
@@ -142,6 +155,8 @@ module.exports = function(issuer, client, authzParams) {
   });
 
   app.get(['/', '/profile'], function(req, res) {
+    clientModel.redirectUrl = redirectUrlFor(req);
+    authzParams.redirect_uri = redirectUrlFor(req);
     if(req.isAuthenticated()){
       res.render('profile', {
         client: clientModel,
@@ -154,7 +169,24 @@ module.exports = function(issuer, client, authzParams) {
   });
 
   app.get('/error', function(req, res) {
-    console.log(JSON.stringify(req));
+    var msg = req.flash('error');
+    console.log(msg);
+    res.render('error', {
+      error: {
+        stack: msg
+      },
+      message: "Error"
+    });
+  });
+
+  app.get('/welcome', function(req, res) {
+    clientModel.redirectUrl = redirectUrlFor(req);
+    res.render('welcome', {
+      thisAppUrl: req.protocol + "://" + req.headers.host,
+      client: clientModel,
+      oktaAdminOrg: issuer.metadata.issuer.replace('.', '-admin.'),
+      issuer: issuer
+    });
   });
 
   // catch 404 and forward as relay state
