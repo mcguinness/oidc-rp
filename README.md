@@ -20,6 +20,26 @@ The following client/RP features from OpenID Connect/OAuth2.0 specifications are
 - [OpenID Connect Discovery 1.0 incorporating errata set 1][feature-discovery]
   - Discovery of OpenID Provider (Issuer) Metadata
 
+# Deploy to Heroku
+
+Prerequisites:
+1. The **name of your Okta org** (e.g. `http://example.okta.com`)
+2. A **Client ID** and **Client Secret**:
+   - Applications>Add Application
+   - Click the **"Create New App"** button
+   - Select **"Web"** as the Platform
+   - Select **"OpenID Connect"** and click the **"Create"** button
+   - Enter a name for the application such as "Sample OIDC App" and click **"Save"**
+   - Enter a "Login Redirect URL", use `http://localhost:8080` for now
+     (You'll change this later)
+   - Navigate to the **Assignments** tab for the application and use **Assign** > **"Assign to Groups"** to assign the app to the **Everyone** group
+   - Navigate back to the **General** tab. You'll use the **"Client ID"** and **Client Secret** values on Heroku
+
+Once you know your **Okta org**, **Client ID**, and **Client Secret** click the button below and follow the prompts:
+
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
+
+
 # Installation
 
 `npm install`
