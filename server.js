@@ -69,7 +69,7 @@ const argv = yargs
     },
     https: {
       description: 'Enables HTTPS Listener (requires key and cert params)',
-      required: true,
+      required: false,
       boolean: true,
       default: false
     }
@@ -85,9 +85,12 @@ const argv = yargs
 
       argv.httpsPrivateKey = fs.readFileSync(argv.httpsPrivateKey).toString();
       argv.httpsCert = fs.readFileSync(argv.httpsCert).toString();
+    } else {
+      return true
     }
   })
   .example('\t$0 --iss https://example.okta.com --cid YRBDFADvhbcsuwGJfP96 --cs 296iRuRznZFupE1F1yjxIw7y-kSYeGGtUJIfGJqo', '')
+      .env('')
   .argv;
 
 Issuer.discover(argv.issuer).then(function(issuer) {
@@ -95,12 +98,11 @@ Issuer.discover(argv.issuer).then(function(issuer) {
     client_id: argv.clientId,
     client_secret: argv.clientSecret
   });
-  const redirectUrl = (argv.https ? 'https' : 'http') + '://localhost:' + argv.port + '/oauth/callback';
   const authzParams = {
     scope: argv.scope,
     response_type: argv.responseType,
     response_mode: argv.responseMode,
-    redirect_uri: redirectUrl
+    redirect_uri: "ERROR"
   };
 
   const app = appFactory(issuer, client, authzParams);
@@ -123,7 +125,6 @@ Issuer.discover(argv.issuer).then(function(issuer) {
     console.log();
     console.log('RP URL:\n\t' + baseUrl);
     console.log('RP Client ID:\n\t' + argv.clientId);
-    console.log('RP OAuth2 Redirect URL:\n\t' + redirectUrl);
     console.log();
     console.log('OP Issuer:\n\t' + issuer.metadata.issuer);
     console.log('OP Authorization URL:\n\t' + issuer.metadata.authorization_endpoint);

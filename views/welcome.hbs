@@ -1,0 +1,24 @@
+<h1>You're almost done!</h1>
+<p>You just need to complete these steps to get this app working with Okta:</p>
+<ol>
+  <li>
+    In the
+    <a href="{{ oktaAdminOrg }}/admin/access/api/trusted_origins" target="_blank">
+      Trusted Origins section of your Okta organization</a>,
+    grant
+    <a href="http://developer.okta.com/docs/api/getting_started/enabling_cors.html" target="_blank">
+      CORS access
+    </a>
+    to: <code>{{ thisAppUrl }}</code>
+  </li>
+  <li>
+    Make sure that the
+    <a href="{{ oktaAdminOrg }}/admin/app/oidc_client/instance/{{ client.id }}/#tab-general" target="_blank">
+      OpenID Connect Application you created</a>
+    has the following URLs registered:
+    <ul>
+      <li>Login redirect URIs: <code>{{ thisAppUrl }}/oauth/callback</code></li>
+      <li>Logout redirect URIs: <code>{{ thisAppUrl }}/logout/callback</code></li>
+    </ul>
+  </li>
+</ol>
