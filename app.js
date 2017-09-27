@@ -94,7 +94,7 @@ module.exports = function(issuer, client, authzParams) {
   app.get('/login', passport.authenticate('oidc'));
   app.get('/login/force', function(req, res, next) {
     return passport.authenticate('oidc', _.defaults({
-        max_age: 0
+        prompt: 'login'
       }, authzParams)
     )(req, res, next);
   })
