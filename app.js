@@ -10,6 +10,7 @@ const logger              = require('morgan');
 const cookieParser        = require('cookie-parser');
 const bodyParser          = require('body-parser');
 const session             = require('express-session');
+const flash               = require('connect-flash');
 const passport            = require('passport');
 const Strategy            = require('openid-client').Strategy;
 
@@ -57,6 +58,7 @@ module.exports = function(issuer, client, authzParams) {
     secret: "You tell me what you want and I'll tell you what you get",
     resave: false,
     saveUninitialized: true}));
+  app.use(flash());
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -99,8 +101,17 @@ module.exports = function(issuer, client, authzParams) {
     )(req, res, next);
   })
 
-  app.post(callbackRoute, passport.authenticate('oidc', { successRedirect: '/profile', failureRedirect: '/error' }));
-  app.get(callbackRoute, passport.authenticate('oidc', { successRedirect: '/profile', failureRedirect: '/error' }));
+  app.post(callbackRoute, passport.authenticate('oidc', {
+    successRedirect: '/profile',
+    failureRedirect: '/error',
+    failureFlash: true
+  }));
+
+  app.get(callbackRoute, passport.authenticate('oidc', {
+    successRedirect: '/profile',
+    failureRedirect: '/error',
+    failureFlash: true
+  }));
 
   app.get('/logout', function(req, res) {
     if (req.isAuthenticated()) {
@@ -154,7 +165,12 @@ module.exports = function(issuer, client, authzParams) {
   });
 
   app.get('/error', function(req, res) {
-    console.log(JSON.stringify(req));
+    const errors = req.flash('error');
+    console.log(errors);
+    res.render('error', {
+      client: clientModel,
+      message: errors.join('<br>')
+    });
   });
 
   // catch 404 and forward as relay state
