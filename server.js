@@ -86,6 +86,7 @@ const argv = yargs
       argv.httpsPrivateKey = fs.readFileSync(argv.httpsPrivateKey).toString();
       argv.httpsCert = fs.readFileSync(argv.httpsCert).toString();
     }
+    return true;
   })
   .example('\t$0 --iss https://example.okta.com --cid YRBDFADvhbcsuwGJfP96 --cs 296iRuRznZFupE1F1yjxIw7y-kSYeGGtUJIfGJqo', '')
   .argv;
