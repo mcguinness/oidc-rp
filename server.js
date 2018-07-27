@@ -10,7 +10,8 @@ const appFactory = require('./app');
 const Issuer     = require('openid-client').Issuer;
 
 const argv = yargs
-  .usage('\nSimple OpenID Connect Relying Party (RP)', {
+  .usage('\nSimple OpenID Connect Relying Party (RP)')
+  .options({
     port: {
       description: 'Web Server Listener Port',
       required: true,

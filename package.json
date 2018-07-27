@@ -8,16 +8,16 @@
   "email": "dev@karlmcguinnes.com",
   "license": "MIT",
   "dependencies": {
-    "body-parser": "~1.18.2",
+    "body-parser": "~1.18.3",
     "connect-flash": "^0.1.1",
     "cookie-parser": "~1.4.3",
-    "express": "~4.16.2",
-    "express-session": "^1.10.1",
+    "express": "~4.16.3",
+    "express-session": "^1.15.6",
     "hbs": "~4.0.1",
-    "lodash": "^4.17.4",
+    "lodash": "^4.17.10",
     "morgan": "~1.9.0",
-    "openid-client": "^1.6.0",
+    "openid-client": "^2.2.1",
     "passport": "^0.4.0",
-    "yargs": "^9.0.1"
+    "yargs": "^12.0.1"
   }
 }
