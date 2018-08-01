@@ -23,6 +23,7 @@ module.exports = function(issuer, client, authzParams) {
     id: client.client_id,
     redirectUrl: authzParams.redirect_uri
   };
+  authzParams = Object.assign({ nonce: crypto.randomBytes(16).toString('hex') }, authzParams);
 
   /**
    * Middleware.
