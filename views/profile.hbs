@@ -32,6 +32,12 @@
 						<p id="response_mode" class="form-control-static">{{params.response_mode}}</p>
 					</div>
 				</div>
+				<div class="form-group">
+					<label for="nonce" class="col-sm-3 control-label">nonce</label>
+					<div class="col-sm-9">
+						<p id="nonce" class="form-control-static">{{params.nonce}}</p>
+					</div>
+				</div>
 			</form>
 		</div>
 	</div>
@@ -86,6 +92,9 @@
 			<div class="col-md-12 text-right">
 				<a href="/logout" class="btn btn-primary input-xlarge">Sign-out</a>
 				<a href="/login/force" class="btn btn-default input-xlarge">Sign-in again</a>
+				{{#if user.tokens.refresh_token}}
+			    <a href="/refresh" class="btn btn-default input-xlarge">Refresh</a>
+			  {{/if}}
 			</div>
 		</div>
 	</form>

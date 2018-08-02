@@ -15,6 +15,11 @@ const passport            = require('passport');
 const Strategy            = require('openid-client').Strategy;
 
 
+function generateNonce() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+
 module.exports = function(issuer, client, authzParams) {
 
   const app = express();
@@ -23,7 +28,6 @@ module.exports = function(issuer, client, authzParams) {
     id: client.client_id,
     redirectUrl: authzParams.redirect_uri
   };
-  authzParams = Object.assign({ nonce: crypto.randomBytes(16).toString('hex') }, authzParams);
 
   /**
    * Middleware.
@@ -72,19 +76,25 @@ module.exports = function(issuer, client, authzParams) {
     done(null, user);
   });
 
-  passport.use('oidc', new Strategy({ client: client, params: authzParams }, function(tokenset, userinfo, done) {
-    console.log('tokenset', tokenset);
-    console.log('access_token', tokenset.access_token);
-    console.log('id_token', tokenset.id_token);
-    console.log('claims', tokenset.claims);
+  passport.use('oidc', new Strategy({
+    client: client,
+    params: _.defaults(authzParams, {
+      nonce: generateNonce()
+    })
+  }, function(tokenSet, userinfo, done) {
+    console.log('tokenSet', tokenSet);
+    console.log('access_token', tokenSet.access_token);
+    console.log('id_token', tokenSet.id_token);
+    console.log('claims', tokenSet.claims);
     console.log('userinfo', userinfo);
 
     return done(null, {
       issuer: issuer.issuer,
-      claims: tokenset.claims,
+      claims: tokenSet.claims,
       tokens: {
-        id_token: tokenset.id_token,
-        access_token: tokenset.access_token
+        id_token: tokenSet.id_token,
+        access_token: tokenSet.access_token,
+        refresh_token: tokenSet.refresh_token
       },
       userinfo: userinfo
     });
@@ -96,9 +106,11 @@ module.exports = function(issuer, client, authzParams) {
 
   app.get('/login', passport.authenticate('oidc'));
   app.get('/login/force', function(req, res, next) {
-    return passport.authenticate('oidc', _.defaults({
-        prompt: 'login'
-      }, authzParams)
+    return passport.authenticate('oidc',
+      _.assign(authzParams, {
+        prompt: 'login',
+        nonce: generateNonce()
+      })
     )(req, res, next);
   })
 
@@ -113,6 +125,53 @@ module.exports = function(issuer, client, authzParams) {
     failureRedirect: '/error',
     failureFlash: true
   }));
+
+  app.get('/refresh', function(req, res) {
+    if (req.user && req.user.tokens.refresh_token) {
+      console.log('Refreshing tokens...');
+      client.refresh(req.user.tokens.refresh_token)
+        .then(function (tokenSet) {
+          console.log('refreshed and validated tokens %j', tokenSet);
+          console.log('refreshed id_token claims %j', tokenSet.claims);
+          _.assign(req.user, {
+            claims: tokenSet.claims,
+            tokens: {
+              id_token: tokenSet.id_token,
+              access_token: tokenSet.access_token,
+              refresh_token: tokenSet.refresh_token
+            }
+          });
+          console.log('Fetching userinfo...');
+          client.userinfo(tokenSet.access_token) // => Promise
+            .then(function (userinfo) {
+              console.log('refreshed userinfo %j', userinfo);
+              req.user.userinfo = userinfo;
+              res.render('profile', {
+                client: clientModel,
+                user: req.user,
+                params: authzParams
+              });
+            })
+            .catch(function(err) {
+              res.render('error', {
+                client: clientModel,
+                message: err.message
+              });
+            });
+        })
+        .catch(function(err) {
+          res.render('error', {
+            client: clientModel,
+            message: err.message
+          });
+        });
+    } else {
+      res.render('error', {
+        client: clientModel,
+        message: "Client doesn't have a refresh token.  Make sure offline_access scope was requested!"
+      });
+    }
+  });
 
   app.get('/logout', function(req, res) {
     if (req.isAuthenticated()) {
