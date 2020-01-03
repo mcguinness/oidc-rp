@@ -12,6 +12,11 @@ const Issuer     = require('openid-client').Issuer;
 const argv = yargs
   .usage('\nSimple OpenID Connect Relying Party (RP)')
   .options({
+    host: {
+      description: 'Web Server Listener Host',
+      required: true,
+      default: 'localhost'
+    },
     port: {
       description: 'Web Server Listener Port',
       required: true,
@@ -97,7 +102,7 @@ Issuer.discover(argv.issuer).then(function(issuer) {
     client_id: argv.clientId,
     client_secret: argv.clientSecret
   });
-  const redirectUrl = (argv.https ? 'https' : 'http') + '://localhost:' + argv.port + '/oauth/callback';
+  const redirectUrl = (argv.https ? 'https' : 'http') + '://' + argv.host + ':' + argv.port + '/oauth/callback';
   const authzParams = {
     scope: argv.scope,
     response_type: argv.responseType,
@@ -114,13 +119,10 @@ Issuer.discover(argv.issuer).then(function(issuer) {
   console.log('starting web server...');
   console.log();
 
-  httpServer.listen(argv.port, function() {
+  httpServer.listen(argv.port, '0.0.0.0', function() {
     const scheme    = argv.https ? 'https' : 'http';
     const address   = httpServer.address();
-    const hostname  = os.hostname();
-    const baseUrl   = address.address === '0.0.0.0' ?
-            scheme + '://' + hostname + ':' + address.port :
-            scheme + '://localhost:' + address.port;
+    const baseUrl   = scheme + '://' + argv.host + ':' + address.port;
 
     console.log();
     console.log('RP URL:\n\t' + baseUrl);
