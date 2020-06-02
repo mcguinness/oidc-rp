@@ -5,6 +5,7 @@ const os         = require('os');
 const fs         = require('fs');
 const http       = require('http');
 const https      = require('https');
+const url        = require('url');
 const _          = require('lodash');
 const appFactory = require('./app');
 const Issuer     = require('openid-client').Issuer;
@@ -12,8 +13,15 @@ const Issuer     = require('openid-client').Issuer;
 const argv = yargs
   .usage('\nSimple OpenID Connect Relying Party (RP)')
   .options({
+    host: {
+      description: 'Web Server Hostname',
+      required: true,
+      alias: 'h',
+      string: true,
+      default: 'localhost'
+    },
     port: {
-      description: 'Web Server Listener Port',
+      description: 'Web Server Port',
       required: true,
       alias: 'p',
       number: true,
@@ -26,16 +34,28 @@ const argv = yargs
       string: true
     },
     clientId: {
-      description: 'Client ID registered for RP at the OP',
+      description: 'Client ID for Relying Party (Must be registered with OP)',
       required: true,
       alias: 'cid',
       string: true
     },
     clientSecret: {
-      description: 'Client Secret registered for RP at the OP',
+      description: 'Client Secret for Relying Party (Must be registered with OP)',
       required: true,
       alias: 'cs',
       string: true
+    },
+    redirectUrl: {
+      description: 'Authorization Response Redirect URL (Must be registered with OP)',
+      required: true,
+      string: true,
+      default: '/oauth/callback'
+    },
+    logoutUrl: {
+      description: 'Post Logout Redirect URL (Must be registered with OP)',
+      required: true,
+      string: true,
+      default: '/logout/callback'
     },
     scope: {
       description: 'OAuth 2.0 Scopes to request from OP (openid must be specified)',
@@ -45,16 +65,22 @@ const argv = yargs
       default: 'openid email phone address profile'
     },
     responseType: {
-      description: 'OAuth 2.0 Response Type(s) for Authentication Request to OP',
+      description: 'Response Type(s) for Authorization Request',
       required: true,
       string: true,
       default: 'code'
     },
     responseMode: {
-      description: 'OAuth 2.0 Response Mode for Authentication Response from OP',
+      description: 'Response Mode for Authorization Request',
       required: true,
       string: true,
       default: 'form_post'
+    },
+    usePKCE: {
+      description: 'Use Proof Key for Code Exchange (PKCE) to secure authorization codes',
+      required: false,
+      boolean: true,
+      default: true
     },
     httpsPrivateKey: {
       description: 'Web Server TLS/SSL Private Key (pem)',
@@ -75,6 +101,10 @@ const argv = yargs
       default: false
     }
   })
+  .coerce('host', function (arg) {
+    let hostUrl = url.parse(arg);
+    return (hostUrl.protocol === null) ? arg : hostUrl.hostname
+  })
   .check(function(argv, aliases) {
     if (argv.https) {
       if (!fs.existsSync(argv.httpsPrivateKey)) {
@@ -89,23 +119,53 @@ const argv = yargs
     }
     return true;
   })
+  .check(function(argv, aliases) {
+    let baseUrl = (argv.https ? 'https' : 'http') + '://' + argv.host + ':' + argv.port;
+    argv.baseUrl = baseUrl;
+
+    let authzCallback = url.parse(argv.redirectUrl);
+    if (authzCallback.protocol === null) {
+      argv.redirectUrl = baseUrl + authzCallback.path;
+    }
+
+    let logoutCallback = url.parse(argv.logoutUrl);
+    if (logoutCallback.protocol === null) {
+      argv.logoutUrl = baseUrl + logoutCallback.path;
+    }
+    return true;
+  })
   .example('\t$0 --iss https://example.okta.com --cid YRBDFADvhbcsuwGJfP96 --cs 296iRuRznZFupE1F1yjxIw7y-kSYeGGtUJIfGJqo', '')
+  .wrap(yargs.terminalWidth())
   .argv;
 
-Issuer.discover(argv.issuer).then(function(issuer) {
-  const client = new issuer.Client({
-    client_id: argv.clientId,
-    client_secret: argv.clientSecret
-  });
-  const redirectUrl = (argv.https ? 'https' : 'http') + '://localhost:' + argv.port + '/oauth/callback';
-  const authzParams = {
-    scope: argv.scope,
-    response_type: argv.responseType,
-    response_mode: argv.responseMode,
-    redirect_uri: redirectUrl
-  };
+// hard-code to oidc metadata discovery
+Issuer.discover(argv.issuer + '/.well-known/openid-configuration').then(function(issuer) {
+  console.log('Discovered issuer %s %O', issuer.issuer, issuer.metadata);
 
-  const app = appFactory(issuer, client, authzParams);
+  const appParams = {
+    issuer, issuer,
+    client: new issuer.Client({
+      client_id: argv.clientId,
+      client_secret: argv.clientSecret,
+      redirect_uris: [argv.redirectUrl],
+      post_logout_redirect_uris: [argv.logoutUrl]
+    }),
+    authzParams: {
+      scope: argv.scope,
+      response_type: argv.responseType,
+      response_mode: argv.responseMode,
+      redirect_uri: argv.redirectUrl
+    },
+    logoutParams: {
+      post_logout_redirect_uri: argv.logoutUrl
+    }
+  }
+
+  if (argv.usePKCE) {
+    appParams.authzParams.code_challenge_method = 'S256'
+  }
+
+  const app = appFactory(appParams);
   const httpServer = argv.https ?
     https.createServer({ key: argv.httpsPrivateKey, cert: argv.httpsCert }, app) :
     http.createServer(app);
@@ -114,27 +174,22 @@ Issuer.discover(argv.issuer).then(function(issuer) {
   console.log('starting web server...');
   console.log();
 
-  httpServer.listen(argv.port, function() {
-    const scheme    = argv.https ? 'https' : 'http';
-    const address   = httpServer.address();
-    const hostname  = os.hostname();
-    const baseUrl   = address.address === '0.0.0.0' ?
-            scheme + '://' + hostname + ':' + address.port :
-            scheme + '://localhost:' + address.port;
-
+  httpServer.listen(argv.port, argv.host, function() {
+    console.log('[Relying Party]');
     console.log();
-    console.log('RP URL:\n\t' + baseUrl);
-    console.log('RP Client ID:\n\t' + argv.clientId);
-    console.log('RP OAuth2 Redirect URL:\n\t' + redirectUrl);
+    console.log('App URL:\n\t' + argv.baseUrl);
+    console.log('Client ID:\n\t' + argv.clientId);
+    console.log('Redirect URL:\n\t' + argv.redirectUrl);
+    console.log('Logout URL:\n\t' + argv.logoutUrl);
     console.log();
-    console.log('OP Issuer:\n\t' + issuer.metadata.issuer);
-    console.log('OP Authorization URL:\n\t' + issuer.metadata.authorization_endpoint);
-    console.log('OP Token URL:\n\t' + issuer.metadata.token_endpoint);
-    console.log('OP UserInfo URL:\n\t' + issuer.metadata.userinfo_endpoint);
-    console.log('OP JWKS URL:\n\t' + issuer.metadata.jwks_uri);
-    console.log('OP End Session URL:\n\t' + issuer.metadata.end_session_endpoint);
+    console.log('[OpenID Provider]');
     console.log();
-    console.log('Authentication Request:\n\t' + client.authorizationUrl(_.defaults({state: '{state}', nonce: '{nonce}'}, authzParams)));
+    console.log('Issuer:\n\t' + issuer.metadata.issuer);
+    console.log('Authorization URL:\n\t' + issuer.metadata.authorization_endpoint);
+    console.log('Token URL:\n\t' + issuer.metadata.token_endpoint);
+    console.log('UserInfo URL:\n\t' + issuer.metadata.userinfo_endpoint);
+    console.log('JWKS URL:\n\t' + issuer.metadata.jwks_uri);
+    console.log('End Session URL:\n\t' + issuer.metadata.end_session_endpoint);
     console.log();
   });
 }).catch((e) => {

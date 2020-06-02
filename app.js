@@ -2,7 +2,6 @@
 
 const express             = require('express');
 const url                 = require('url');
-const crypto              = require('crypto');
 const _                   = require('lodash');
 const path                = require('path');
 const hbs                 = require('hbs');
@@ -12,22 +11,66 @@ const bodyParser          = require('body-parser');
 const session             = require('express-session');
 const flash               = require('connect-flash');
 const passport            = require('passport');
+const generators          = require('openid-client').generators;
 const Strategy            = require('openid-client').Strategy;
 
-
-function generateNonce() {
-  return crypto.randomBytes(16).toString('hex');
-}
-
-
-module.exports = function(issuer, client, authzParams) {
+module.exports = function(params) {
+  const AUTHZ_CALLBACK_PATH = url.parse(params.authzParams.redirect_uri).path;
+  const LOGOUT_CALLBACK_PATH = url.parse(params.logoutParams.post_logout_redirect_uri).path;
 
   const app = express();
-  const callbackRoute = url.parse(authzParams.redirect_uri).path;
-  const clientModel = {
-    id: client.client_id,
-    redirectUrl: authzParams.redirect_uri
+  const client = params.client;
+  const issuer = params.issuer;
+  const authzParams = params.authzParams;
+  const logoutParams = params.logoutParams;
+  const clientViewModel = {
+    client_id: client.client_id,
+    redirect_uri: authzParams.redirect_uri,
+    post_logout_redirect_uri: logoutParams.post_logout_redirect_uri,
+    token_endpoint_auth_method: client.token_endpoint_auth_method
   };
+  const strategy = new Strategy({
+    client: client,
+    params: authzParams,
+    usePKCE: authzParams.code_challenge_method === 'S256'
+  },
+    // strategy inspects arg count to fetch userinfo
+    authzParams.response_type === 'id_token' ? verifyIdTokenOnly : verifyIdTokenAndUserInfo
+  );
+
+  /**
+   * Passport Authentication Verification
+   */
+
+  function verifyIdTokenOnly(tokenSet, done) {
+    console.log('tokenSet', tokenSet);
+    console.log('claims', tokenSet.claims());
+
+    return done(null, {
+      issuer: issuer.issuer,
+      claims: tokenSet.claims(),
+      tokens: {
+        id_token: tokenSet.id_token
+      }
+    });
+  }
+
+  function verifyIdTokenAndUserInfo(tokenSet, userinfo, done) {
+    console.log('tokenSet', tokenSet);
+    console.log('claims', tokenSet.claims());
+    console.log('userinfo', userinfo);
+
+    return done(null, {
+      issuer: issuer.issuer,
+      claims: tokenSet.claims(),
+      tokens: {
+        id_token: tokenSet.id_token,
+        access_token: tokenSet.access_token,
+        refresh_token: tokenSet.refresh_token
+      },
+      userinfo: userinfo
+    });
+  }
 
   /**
    * Middleware.
@@ -64,10 +107,11 @@ module.exports = function(issuer, client, authzParams) {
     resave: false,
     saveUninitialized: true}));
   app.use(flash());
+
+  // passport
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // passport
   passport.serializeUser(function(user, done) {
     done(null, user);
   });
@@ -76,29 +120,8 @@ module.exports = function(issuer, client, authzParams) {
     done(null, user);
   });
 
-  passport.use('oidc', new Strategy({
-    client: client,
-    params: _.defaults(authzParams, {
-      nonce: generateNonce()
-    })
-  }, function(tokenSet, userinfo, done) {
-    console.log('tokenSet', tokenSet);
-    console.log('access_token', tokenSet.access_token);
-    console.log('id_token', tokenSet.id_token);
-    console.log('claims', tokenSet.claims);
-    console.log('userinfo', userinfo);
+  passport.use('oidc', strategy);
 
-    return done(null, {
-      issuer: issuer.issuer,
-      claims: tokenSet.claims,
-      tokens: {
-        id_token: tokenSet.id_token,
-        access_token: tokenSet.access_token,
-        refresh_token: tokenSet.refresh_token
-      },
-      userinfo: userinfo
-    });
-  }));
 
   /**
    * Routes
@@ -108,19 +131,18 @@ module.exports = function(issuer, client, authzParams) {
   app.get('/login/force', function(req, res, next) {
     return passport.authenticate('oidc',
       _.assign(authzParams, {
-        prompt: 'login',
-        nonce: generateNonce()
+        prompt: 'login'
       })
     )(req, res, next);
   })
 
-  app.post(callbackRoute, passport.authenticate('oidc', {
+  app.post(AUTHZ_CALLBACK_PATH, passport.authenticate('oidc', {
     successRedirect: '/profile',
     failureRedirect: '/error',
     failureFlash: true
   }));
 
-  app.get(callbackRoute, passport.authenticate('oidc', {
+  app.get(AUTHZ_CALLBACK_PATH, passport.authenticate('oidc', {
     successRedirect: '/profile',
     failureRedirect: '/error',
     failureFlash: true
@@ -128,46 +150,52 @@ module.exports = function(issuer, client, authzParams) {
 
   app.get('/refresh', function(req, res) {
     if (req.user && req.user.tokens.refresh_token) {
-      console.log('Refreshing tokens...');
+      console.log('Refreshing tokens for subject %s...', req.user.claims.sub);
       client.refresh(req.user.tokens.refresh_token)
         .then(function (tokenSet) {
-          console.log('refreshed and validated tokens %j', tokenSet);
-          console.log('refreshed id_token claims %j', tokenSet.claims);
-          _.assign(req.user, {
-            claims: tokenSet.claims,
+          console.log('Successfully refreshed tokens for subject %s', req.user.claims.sub);
+          console.log('tokenSet', tokenSet);
+          console.log('claims', tokenSet.claims());
+          const refreshUser = {
+            claims: tokenSet.claims(),
             tokens: {
               id_token: tokenSet.id_token,
               access_token: tokenSet.access_token,
               refresh_token: tokenSet.refresh_token
             }
-          });
-          console.log('Fetching userinfo...');
+          };
+          console.log('Fetching userinfo with new access token for subject %s...', req.user.claims.sub);
           client.userinfo(tokenSet.access_token) // => Promise
             .then(function (userinfo) {
-              console.log('refreshed userinfo %j', userinfo);
-              req.user.userinfo = userinfo;
+              console.log('Successfully refreshed userinfo for subject %s', req.user.claims.sub);
+              console.log(userinfo);
+              refreshUser.userinfo = userinfo;
+
+              req.user = refreshUser;
               res.render('profile', {
-                client: clientModel,
-                user: req.user,
+                client: clientViewModel,
+                user: refreshUser,
                 params: authzParams
               });
+
+
             })
             .catch(function(err) {
               res.render('error', {
-                client: clientModel,
+                client: clientViewModel,
                 message: err.message
               });
             });
         })
         .catch(function(err) {
           res.render('error', {
-            client: clientModel,
+            client: clientViewModel,
             message: err.message
           });
         });
     } else {
       res.render('error', {
-        client: clientModel,
+        client: clientViewModel,
         message: "Client doesn't have a refresh token.  Make sure offline_access scope was requested!"
       });
     }
@@ -176,12 +204,12 @@ module.exports = function(issuer, client, authzParams) {
   app.get('/logout', function(req, res) {
     if (req.isAuthenticated()) {
       if (issuer.end_session_endpoint) {
-        req.session.logout_state = crypto.randomBytes(24).toString('hex');
+        req.session.logout_state = generators.random();
         const logoutUrl = url.format(Object.assign(url.parse(issuer.end_session_endpoint), {
           search: null,
           query: {
             id_token_hint: req.user.tokens.id_token,
-            post_logout_redirect_uri: req.protocol + '://' + req.get('host') + req.url + '/callback',
+            post_logout_redirect_uri: logoutParams.post_logout_redirect_uri,
             state: req.session.logout_state
           }
         }));
@@ -191,20 +219,19 @@ module.exports = function(issuer, client, authzParams) {
         console.log('User %s successfully logged out', req.user.claims.id);
         req.session.destroy();
         return res.render('logout', {
-          client: clientModel
+          client: clientViewModel
         });
       }
     }
   });
-
-  app.get('/logout/callback', function(req, res) {
+  app.get(LOGOUT_CALLBACK_PATH, function(req, res) {
     console.log(req.query);
     if (req.isAuthenticated() && req.query.state && req.session.logout_state) {
       if (req.query.state === req.session.logout_state) {
         console.log('User %s successfully logged out', req.user.claims.id);
         req.session.destroy();
         return res.render('logout', {
-          client: clientModel
+          client: clientViewModel
         });
       } else {
         console.log('Unable to logout user because the redirected state doesn\'t match the session state value');
@@ -215,7 +242,7 @@ module.exports = function(issuer, client, authzParams) {
   app.get(['/', '/profile'], function(req, res) {
     if(req.isAuthenticated()){
       res.render('profile', {
-        client: clientModel,
+        client: clientViewModel,
         user: req.user,
         params: authzParams
       });
@@ -228,7 +255,7 @@ module.exports = function(issuer, client, authzParams) {
     const errors = req.flash('error');
     console.log(errors);
     res.render('error', {
-      client: clientModel,
+      client: clientViewModel,
       message: errors.join('<br>')
     });
   });
@@ -245,7 +272,7 @@ module.exports = function(issuer, client, authzParams) {
   app.use(function(err, req, res, next) {
     res.status(err.status || 500);
     res.render('error', {
-      client: clientModel,
+      client: clientViewModel,
       message: err.message,
       error: err.status === 404 ? null : err
     });

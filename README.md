@@ -6,19 +6,27 @@ This app provides a test client that acts as a Relying Party (RP) for [OpenID Co
 
 The following client/RP features from OpenID Connect/OAuth2.0 specifications are implemented by the app.
 
-- [OpenID Connect Core 1.0 incorporating errata set 1][feature-core]
+- [OpenID Connect Core 1.0][feature-core]
   - Authorization Callback
     - Authorization Code Flow
     - Implicit Flow
     - Hybrid Flow
   - UserInfo Request
+  - Fetching Distributed Claims
+  - Unpacking Aggregated Claims
   - Offline Access / Refresh Token Grant
+  - Client Credentials Grant
   - Client Authentication
+    - none (PKCE)
     - client_secret_basic
     - client_secret_post
     - client_secret_jwt
-- [OpenID Connect Discovery 1.0 incorporating errata set 1][feature-discovery]
+    - private_key_jwt
+  - Consuming Self-Issued OpenID Provider ID Token response
+- [OpenID Connect Discovery 1.0][feature-discovery]
   - Discovery of OpenID Provider (Issuer) Metadata
+- [OpenID Connect Session Management 1.0 - draft 28][feature-rp-logout]
+  - RP-Initiated Logout
 
 # Installation
 
@@ -69,16 +77,22 @@ The following example shows OAuth client registration for an OP that supports [O
 
 ```
 Options:
-  --port, -p                Web Server Listener Port                                        [required]  [default: 7080]
-  --issuer, --iss           OpenID Connect Provider (OP) Issuer URL                         [required]
-  --clientId, --cid         Client ID registered for RP at the OP                           [required]
-  --clientSecret, --cs      Client Secret registered for RP at the OP                       [required]
-  --scope, --scp            OAuth 2.0 Scopes to request from OP (openid must be specified)  [required]  [default: "openid email phone address profile"]
-  --responseType            OAuth 2.0 Response Type(s) for Authentication Request to OP     [required]  [default: "code"]
-  --responseMode            OAuth 2.0 Response Mode for Authentication Response from OP     [required]  [default: "form_post"]
-  --httpsPrivateKey, --key  Web Server TLS/SSL Private Key (pem)
-  --httpsCert, --cert       Web Server TLS/SSL Certificate (pem)
-  --https                   Enables HTTPS Listener (requires key and cert params)           [required]  [default: false]
+  --help                    Show help                                                                                                                      [boolean]
+  --version                 Show version number                                                                                                            [boolean]
+  --host, -h                Web Server Hostname                                                                           [string] [required] [default: "localhost"]
+  --port, -p                Web Server Port                                                                                      [number] [required] [default: 7080]
+  --issuer, --iss           OpenID Connect Provider (OP) Issuer URL                                                                              [string] [required]
+  --clientId, --cid         Client ID for Relying Party (Must be registered with OP)                                                             [string] [required]
+  --clientSecret, --cs      Client Secret for Relying Party (Must be registered with OP)                                                         [string] [required]
+  --redirectUrl             Authorization Response Redirect URL (Must be registered with OP)                        [string] [required] [default: "/oauth/callback"]
+  --logoutUrl               Post Logout Redirect URL (Must be registered with OP)                                  [string] [required] [default: "/logout/callback"]
+  --scope, --scp            OAuth 2.0 Scopes to request from OP (openid must be specified)       [string] [required] [default: "openid email phone address profile"]
+  --responseType            Response Type(s) for Authorization Request                                                         [string] [required] [default: "code"]
+  --responseMode            Response Mode for Authorization Request                                                       [string] [required] [default: "form_post"]
+  --usePKCE                 Use Proof Key for Code Exchange (PKCE) to secure authorization codes                                           [boolean] [default: true]
+  --httpsPrivateKey, --key  Web Server TLS/SSL Private Key (pem)                                                                                            [string]
+  --httpsCert, --cert       Web Server TLS/SSL Certificate (pem)                                                                                            [string]
+  --https                   Enables HTTPS Listener (requires key and cert params)                                              [boolean] [required] [default: false]
 ```
 
 > **Note:** You must [register the Relying Party (RP) as a client](#oauth-client-registration) at the OpenID Provider (OP) manually to obtain a `client_id` and `client_secret`.  The default `redirect_uri` for the client is `http://localhost:7080/oauth/callback`.
@@ -102,4 +116,5 @@ Route              | Description
 [openid-connect]: http://openid.net/connect/
 [feature-core]: http://openid.net/specs/openid-connect-core-1_0.html
 [feature-discovery]: http://openid.net/specs/openid-connect-discovery-1_0.html
-[client-reg]: https://tools.ietf.org/html/rfc7591
+[feature-rp-logout]: https://openid.net/specs/openid-connect-session-1_0.html#RPLogout
+
