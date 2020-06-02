@@ -47,8 +47,6 @@ Parameter                   | Default Value                           | Descript
 
 ### Sample Dynamic Client Registration
 
-The following example shows OAuth client registration for an OP that supports [OAuth 2.0 Dynamic Client Registration Protocol][client-reg]
-
 ```json
 {
   "client_name": "Simple OIDC RP",
@@ -95,7 +93,7 @@ Options:
   --https                   Enables HTTPS Listener (requires key and cert params)                                              [boolean] [required] [default: false]
 ```
 
-> **Note:** You must [register the Relying Party (RP) as a client](#oauth-client-registration) at the OpenID Provider (OP) manually to obtain a `client_id` and `client_secret`.  The default `redirect_uri` for the client is `http://localhost:7080/oauth/callback`.
+> **Note:** You must register the Relying Party (RP) as a client at the OpenID Provider (OP) manually to obtain a `client_id` and `client_secret`.  The default `redirect_uri` for the client is `http://localhost:7080/oauth/callback`.
 
 ## Example
 
