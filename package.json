@@ -1,6 +1,6 @@
 {
   "name": "oidc-rp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Simple OpenID Connect Relying Party (RP) for express.js",
   "main": "server.js",
   "private": true,
@@ -21,6 +21,6 @@
     "yargs": "^15.3.1"
   },
   "engines": {
-    "node": ">=6.0.0"
+    "node": ">=10.0.0"
   }
 }
